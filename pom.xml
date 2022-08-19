@@ -34,7 +34,7 @@
         <plugin>
           <artifactId>maven-javadoc-plugin</artifactId>
           <groupId>org.apache.maven.plugins</groupId>
-          <version>3.4.0</version>
+          <version>3.4.1</version>
         </plugin>
       </plugins>
     </pluginManagement>
