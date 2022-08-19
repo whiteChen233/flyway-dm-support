@@ -1,4 +1,4 @@
-package com.github.whitechen233.database.dm;
+package io.github.whitechen233.database.dm;
 
 import java.sql.Connection;
 import java.sql.SQLException;

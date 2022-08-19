@@ -1,4 +1,4 @@
-package com.github.whitechen233.database.dm;
+package io.github.whitechen233.database.dm;
 
 import org.flywaydb.core.internal.callback.CallbackExecutor;
 import org.flywaydb.core.internal.jdbc.JdbcTemplate;

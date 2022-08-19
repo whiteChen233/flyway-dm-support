@@ -1,4 +1,4 @@
-package com.github.whitechen233.database.dm;
+package io.github.whitechen233.database.dm;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -62,6 +62,7 @@ public class DmParser extends Parser {
         return "^(" + StringUtils.arrayToDelimitedString("|", commands) + ")";
     }
 
+    @Override
     protected ParsedSqlStatement createStatement(PeekingReader reader, Recorder recorder, int statementPos,
                                                  int statementLine, int statementCol, int nonCommentPartPos,
                                                  int nonCommentPartLine, int nonCommentPartCol,
@@ -79,6 +80,7 @@ public class DmParser extends Parser {
                                      delimiter, sql);
     }
 
+    @Override
     protected StatementType detectStatementType(String simplifiedStatement, ParserContext context) {
         if (!PLSQL_PACKAGE_BODY_WRAPPED_REGEX.matcher(simplifiedStatement).matches()
             && !PLSQL_PACKAGE_DEFINITION_WRAPPED_REGEX.matcher(simplifiedStatement).matches()
@@ -200,10 +202,8 @@ public class DmParser extends Parser {
 
     @Override
     protected boolean doTokensMatchPattern(List<Token> previousTokens, Token current, Pattern regex) {
-        if (regex == PLSQL_PACKAGE_DEFINITION_REGEX && previousTokens.stream().anyMatch((t) -> {
-            return t.getType() == TokenType.KEYWORD && t.getText().equalsIgnoreCase("ACCESSIBLE");
-        })) {
-            ArrayList<String> tokenStrings = new ArrayList();
+        if (regex == PLSQL_PACKAGE_DEFINITION_REGEX && previousTokens.stream().anyMatch(t -> t.getType() == TokenType.KEYWORD && "ACCESSIBLE".equalsIgnoreCase(t.getText()))) {
+            List<String> tokenStrings = new ArrayList<>();
             tokenStrings.add(current.getText());
 
             for (int i = previousTokens.size() - 1; i >= 0; --i) {
