@@ -4,3 +4,17 @@
 
 . https://flywaydb.org/[Homepage - Flyway] & https://github.com/flyway/flyway[GitHub - Flyway]
 . https://www.dameng.com/[达梦数据]
+
+== Usage
+
+```xml
+<dependency>
+    <groupId>io.github.whitechen233</groupId>
+    <artifactId>flyway-dm-support</artifactId>
+    <version>1.0-RELEASE</version>
+</dependency>
+```
+
+== Tip
+
+奈何水平不高，目前版本仅仅只是能用，先凑合用吧
