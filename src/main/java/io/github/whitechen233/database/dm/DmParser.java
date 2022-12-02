@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import org.flywaydb.core.api.configuration.Configuration;
 import org.flywaydb.core.internal.parser.Parser;
@@ -17,21 +18,19 @@ import org.flywaydb.core.internal.parser.Token;
 import org.flywaydb.core.internal.parser.TokenType;
 import org.flywaydb.core.internal.sqlscript.Delimiter;
 import org.flywaydb.core.internal.sqlscript.ParsedSqlStatement;
-import org.flywaydb.core.internal.util.StringUtils;
 
 public class DmParser extends Parser {
 
     private static final Delimiter PLSQL_DELIMITER = new Delimiter("/", true);
-    private static final String ACCESSIBLE_BY_REGEX = "ACCESSIBLE\\sBY\\s\\(?((FUNCTION|PROCEDURE|PACKAGE|TRIGGER|TYPE)\\s[^\\s]*\\s?+)*\\)?";
     private static final Pattern PLSQL_TYPE_BODY_REGEX = Pattern.compile(
-        "^CREATE(\\sOR\\sREPLACE)?(\\s(NON)?EDITIONABLE)?\\sTYPE\\sBODY\\s([^\\s]*\\s)?(IS|AS)");
+        "^CREATE(\\sOR\\sREPLACE)?(\\s(NON)?EDITIONABLE)?\\sTYPE\\sBODY\\s(\\S*\\s)?(IS|AS)");
     private static final Pattern PLSQL_PACKAGE_BODY_REGEX = Pattern.compile(
-        "^CREATE(\\s*OR\\s*REPLACE)?(\\s*(NON)?EDITIONABLE)?\\s*PACKAGE\\s*BODY\\s*([^\\s]*\\s)?(IS|AS)");
+        "^CREATE(\\s*OR\\s*REPLACE)?(\\s*(NON)?EDITIONABLE)?\\s*PACKAGE\\s*BODY\\s*(\\S*\\s)?(IS|AS)");
     private static final StatementType PLSQL_PACKAGE_BODY_STATEMENT = new StatementType();
     private static final Pattern PLSQL_PACKAGE_DEFINITION_REGEX = Pattern.compile(
-        "^CREATE(\\s*OR\\s*REPLACE)?(\\s*(NON)?EDITIONABLE)?\\s*PACKAGE\\s([^\\s*]*\\s*)?(AUTHID\\s*[^\\s*]*\\s*|ACCESSIBLE\\sBY\\s\\(?((FUNCTION|PROCEDURE|PACKAGE|TRIGGER|TYPE)\\s[^\\s]*\\s?+)*\\)?)*(IS|AS)");
+        "^CREATE(\\s*OR\\s*REPLACE)?(\\s*(NON)?EDITIONABLE)?\\s*PACKAGE\\s([^\\s*]*\\s*)?(AUTHID\\s*[^\\s*]*\\s*|ACCESSIBLE\\sBY\\s\\(?((FUNCTION|PROCEDURE|PACKAGE|TRIGGER|TYPE)\\s\\S*\\s?+)*\\)?)*(IS|AS)");
     private static final Pattern PLSQL_VIEW_REGEX = Pattern.compile(
-        "^CREATE(\\sOR\\sREPLACE)?(\\s(NON)?EDITIONABLE)?\\sVIEW\\s([^\\s]*\\s)?AS\\sWITH\\s(PROCEDURE|FUNCTION)");
+        "^CREATE(\\sOR\\sREPLACE)?(\\s(NON)?EDITIONABLE)?\\sVIEW\\s(\\S*\\s)?AS\\sWITH\\s(PROCEDURE|FUNCTION)");
     private static final StatementType PLSQL_VIEW_STATEMENT = new StatementType();
     private static final Pattern PLSQL_REGEX = Pattern.compile(
         "^CREATE(\\sOR\\sREPLACE)?(\\s(NON)?EDITIONABLE)?\\s(FUNCTION|PROCEDURE|TYPE|TRIGGER)");
@@ -41,25 +40,17 @@ public class DmParser extends Parser {
         "^CREATE(\\sOR\\sREPLACE)?(\\sAND\\s(RESOLVE|COMPILE))?(\\sNOFORCE)?\\sJAVA\\s(SOURCE|RESOURCE|CLASS)");
     private static final StatementType PLSQL_JAVA_STATEMENT = new StatementType();
     private static final Pattern PLSQL_PACKAGE_BODY_WRAPPED_REGEX = Pattern.compile(
-        "^CREATE(\\sOR\\sREPLACE)?(\\s(NON)?EDITIONABLE)?\\sPACKAGE\\sBODY\\sWRAPPED(\\s[^\\s]*)*");
+        "^CREATE(\\sOR\\sREPLACE)?(\\s(NON)?EDITIONABLE)?\\sPACKAGE\\sBODY\\sWRAPPED(\\s\\S*)*");
     private static final Pattern PLSQL_PACKAGE_DEFINITION_WRAPPED_REGEX = Pattern.compile(
-        "^CREATE(\\sOR\\sREPLACE)?(\\s(NON)?EDITIONABLE)?\\sPACKAGE\\sWRAPPED(\\s[^\\s]*)*");
+        "^CREATE(\\sOR\\sREPLACE)?(\\s(NON)?EDITIONABLE)?\\sPACKAGE\\sWRAPPED(\\s\\S*)*");
     private static final Pattern PLSQL_WRAPPED_REGEX = Pattern.compile(
-        "^CREATE(\\sOR\\sREPLACE)?(\\s(NON)?EDITIONABLE)?\\s(FUNCTION|PROCEDURE|TYPE)\\sWRAPPED(\\s[^\\s]*)*");
+        "^CREATE(\\sOR\\sREPLACE)?(\\s(NON)?EDITIONABLE)?\\s(FUNCTION|PROCEDURE|TYPE)\\sWRAPPED(\\s\\S*)*");
     private static final StatementType PLSQL_WRAPPED_STATEMENT = new StatementType();
     private static final List<String> CONTROL_FLOW_KEYWORDS = Arrays.asList("IF", "LOOP", "CASE");
     private int initialWrappedBlockDepth = -1;
 
     public DmParser(Configuration configuration, ParsingContext parsingContext) {
         super(configuration, parsingContext, 3);
-    }
-
-    private static Pattern toRegex(String... commands) {
-        return Pattern.compile(toRegexPattern(commands));
-    }
-
-    private static String toRegexPattern(String... commands) {
-        return "^(" + StringUtils.arrayToDelimitedString("|", commands) + ")";
     }
 
     @Override
@@ -126,10 +117,10 @@ public class DmParser extends Parser {
     @Override
     protected boolean shouldAdjustBlockDepth(ParserContext context, List<Token> tokens, Token token) {
         TokenType tokenType = token.getType();
-        if (context.getStatementType() != PLSQL_PACKAGE_BODY_STATEMENT
-            || TokenType.EOF != tokenType && TokenType.DELIMITER != tokenType) {
-            if (context.getStatementType() == PLSQL_WRAPPED_STATEMENT && (TokenType.EOF == tokenType
-                || TokenType.DELIMITER == tokenType)) {
+        if (context.getStatementType() != PLSQL_PACKAGE_BODY_STATEMENT || Stream.of(TokenType.EOF, TokenType.DELIMITER)
+            .allMatch(i -> i != tokenType)) {
+            if (context.getStatementType() == PLSQL_WRAPPED_STATEMENT && Stream.of(TokenType.EOF, TokenType.DELIMITER)
+                .anyMatch(i -> i == tokenType)) {
                 return true;
             } else {
                 return token.getType() == TokenType.SYMBOL && context.getStatementType() == PLSQL_JAVA_STATEMENT
@@ -156,8 +147,7 @@ public class DmParser extends Parser {
                 }
 
             } else {
-                if (context.getBlockDepth() > this.initialWrappedBlockDepth && context.getBlockInitiator()
-                    .equals("WRAPPED")) {
+                if (context.getBlockDepth() > this.initialWrappedBlockDepth && "WRAPPED".equals(context.getBlockInitiator())) {
                     this.initialWrappedBlockDepth = -1;
                     context.decreaseBlockDepth();
                 }
@@ -171,21 +161,24 @@ public class DmParser extends Parser {
 
                 } else {
                     if ("BEGIN".equals(keywordText)
-                        || CONTROL_FLOW_KEYWORDS.contains(keywordText) && !this.precedingEndAttachesToThisKeyword(
-                        tokens, parensDepth, context, keyword) || "TRIGGER".equals(keywordText) && lastTokenIs(tokens,
-                                                                                                               parensDepth,
-                                                                                                               "COMPOUND")
-                        || context.getBlockDepth() == 0 && (
-                        this.doTokensMatchPattern(tokens, keyword, PLSQL_PACKAGE_BODY_REGEX)
-                            || this.doTokensMatchPattern(tokens, keyword, PLSQL_PACKAGE_DEFINITION_REGEX)
-                            || this.doTokensMatchPattern(tokens, keyword, PLSQL_TYPE_BODY_REGEX))) {
+                        || CONTROL_FLOW_KEYWORDS.contains(keywordText)
+                        && !this.precedingEndAttachesToThisKeyword(tokens, parensDepth, context, keyword)
+                        || "TRIGGER".equals(keywordText) && lastTokenIs(tokens, parensDepth, "COMPOUND")
+                        || context.getBlockDepth() == 0 && Stream.of(PLSQL_PACKAGE_BODY_REGEX,
+                                                                     PLSQL_PACKAGE_DEFINITION_REGEX,
+                                                                     PLSQL_TYPE_BODY_REGEX)
+                        .anyMatch(i -> this.doTokensMatchPattern(tokens, keyword, i))) {
                         context.increaseBlockDepth(keywordText);
                     } else if ("END".equals(keywordText)) {
                         context.decreaseBlockDepth();
                     }
 
-                    if (context.getStatementType() == PLSQL_PACKAGE_BODY_STATEMENT && (TokenType.EOF == tokenType
-                        || TokenType.DELIMITER == tokenType) && context.getBlockDepth() == 1) {
+                    if (context.getBlockDepth() > 0 && lastTokenIs(tokens, parensDepth, "IF")
+                        && "EXISTS".equalsIgnoreCase(keywordText)) {
+                        context.decreaseBlockDepth();
+                    }
+
+                    if (context.getStatementType() == PLSQL_PACKAGE_BODY_STATEMENT && Stream.of(TokenType.EOF,  TokenType.DELIMITER).anyMatch(i -> i == tokenType) && context.getBlockDepth() == 1) {
                         context.decreaseBlockDepth();
                     }
 
@@ -196,13 +189,15 @@ public class DmParser extends Parser {
 
     private boolean precedingEndAttachesToThisKeyword(List<Token> tokens, int parensDepth, ParserContext context,
                                                       Token keyword) {
-        return lastTokenIs(tokens, parensDepth, "END") && lastTokenIsOnLine(tokens, parensDepth, keyword.getLine())
+        return lastTokenIs(tokens, parensDepth, "END")
+            && lastTokenIsOnLine(tokens, parensDepth, keyword.getLine())
             && keyword.getText().equals(context.getLastClosedBlockInitiator());
     }
 
     @Override
     protected boolean doTokensMatchPattern(List<Token> previousTokens, Token current, Pattern regex) {
-        if (regex == PLSQL_PACKAGE_DEFINITION_REGEX && previousTokens.stream().anyMatch(t -> t.getType() == TokenType.KEYWORD && "ACCESSIBLE".equalsIgnoreCase(t.getText()))) {
+        if (regex == PLSQL_PACKAGE_DEFINITION_REGEX && previousTokens.stream()
+            .anyMatch(t -> t.getType() == TokenType.KEYWORD && "ACCESSIBLE".equalsIgnoreCase(t.getText()))) {
             List<String> tokenStrings = new ArrayList<>();
             tokenStrings.add(current.getText());
 
@@ -222,32 +217,31 @@ public class DmParser extends Parser {
                 }
             }
 
-            return regex.matcher(builder.toString()).matches() || super.doTokensMatchPattern(previousTokens, current,
-                                                                                             regex);
+            return regex.matcher(builder.toString()).matches() || super.doTokensMatchPattern(previousTokens, current, regex);
         } else {
             return super.doTokensMatchPattern(previousTokens, current, regex);
         }
     }
 
     @Override
-    protected boolean isDelimiter(String peek, ParserContext context, int col, int colIgnoringWhitepace) {
+    protected boolean isDelimiter(String peek, ParserContext context, int col, int colIgnoringWhitespace) {
         Delimiter delimiter = context.getDelimiter();
         if (peek.startsWith(delimiter.getEscape() + delimiter.getDelimiter())) {
             return true;
         } else {
             if (delimiter.shouldBeAloneOnLine()) {
-                if (colIgnoringWhitepace == 1 && peek == delimiter.getDelimiter()) {
+                if (colIgnoringWhitespace == 1 && peek.equals(delimiter.getDelimiter())) {
                     return true;
                 }
 
-                if (colIgnoringWhitepace != 1) {
+                if (colIgnoringWhitespace != 1) {
                     return false;
                 }
-            } else if (colIgnoringWhitepace == 1 && "/".equals(peek.trim())) {
+            } else if (colIgnoringWhitespace == 1 && "/".equals(peek.trim())) {
                 return true;
             }
 
-            return super.isDelimiter(peek, context, col, colIgnoringWhitepace);
+            return super.isDelimiter(peek, context, col, colIgnoringWhitespace);
         }
     }
 
@@ -257,7 +251,7 @@ public class DmParser extends Parser {
             return false;
         } else {
             char firstChar = peek.charAt(0);
-            return (firstChar == 'q' || firstChar == 'Q') && peek.charAt(1) == '\'';
+            return Stream.of('q', 'Q').anyMatch(i -> firstChar == i) && peek.charAt(1) == '\'';
         }
     }
 
