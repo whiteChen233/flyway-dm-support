@@ -12,6 +12,7 @@ import org.flywaydb.core.internal.database.base.Database;
 import org.flywaydb.core.internal.database.base.Table;
 import org.flywaydb.core.internal.jdbc.JdbcConnectionFactory;
 import org.flywaydb.core.internal.jdbc.StatementInterceptor;
+import org.flywaydb.core.internal.license.Edition;
 import org.flywaydb.core.internal.util.StringUtils;
 
 public class DmDatabase extends Database<DmConnection> {
@@ -40,11 +41,10 @@ public class DmDatabase extends Database<DmConnection> {
 
     @Override
     public final void ensureSupported() {
-        //最小支持版本7
+        // 最小支持版本7
         ensureDatabaseIsRecentEnough("7.0");
-        //最新支持版本8.1
-        ensureDatabaseNotOlderThanOtherwiseRecommendUpgradeToFlywayEdition("8.1",
-                                                                           org.flywaydb.core.internal.license.Edition.ENTERPRISE);
+        // 最新支持版本8.1
+        ensureDatabaseNotOlderThanOtherwiseRecommendUpgradeToFlywayEdition("8.1", Edition.COMMUNITY);
         recommendFlywayUpgradeIfNecessary("8.1");
     }
 
@@ -119,13 +119,15 @@ public class DmDatabase extends Database<DmConnection> {
     }
 
     boolean isPrivOrRoleGranted(String name) throws SQLException {
-        return queryReturnsRows("SELECT 1 FROM SESSION_PRIVS WHERE PRIVILEGE = ? UNION ALL " +
-                                    "SELECT 1 FROM SESSION_ROLES WHERE ROLE = ?", name, name);
+        return queryReturnsRows(
+            "SELECT 1 FROM SESSION_PRIVS WHERE PRIVILEGE = ? UNION ALL SELECT 1 FROM SESSION_ROLES WHERE ROLE = ?",
+            name, name);
     }
 
     private boolean isDataDictViewAccessible(String owner, String name) throws SQLException {
-        return queryReturnsRows("SELECT * FROM ALL_TAB_PRIVS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?" +
-                                    " AND PRIVILEGE = 'SELECT'", owner, name);
+        return queryReturnsRows(
+            "SELECT * FROM ALL_TAB_PRIVS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND PRIVILEGE = 'SELECT'", owner,
+            name);
     }
 
     boolean isDataDictViewAccessible(String name) throws SQLException {
@@ -216,10 +218,8 @@ public class DmDatabase extends Database<DmConnection> {
             "TSMSYS"
         ).collect(Collectors.toSet());
 
-        result.addAll(getMainConnection().getJdbcTemplate().queryForStringList("SELECT USERNAME FROM ALL_USERS " +
-                                                                                   "WHERE REGEXP_LIKE(USERNAME, '^(APEX|FLOWS)_\\d+$')"
-                                                                                   +
-                                                                                   " OR DM_MAINTAINED = 'Y'"
+        result.addAll(getMainConnection().getJdbcTemplate().queryForStringList(
+            "SELECT USERNAME FROM ALL_USERS WHERE REGEXP_LIKE(USERNAME, '^(APEX|FLOWS)_\\d+$') OR DM_MAINTAINED = 'Y'"
         ));
         return result;
     }
